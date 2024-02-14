@@ -79,7 +79,7 @@ Call me on my cell phone"""
     unigram_model = unigram()
     dic_song_dic_term_count, dic_song_genre = unigram_model.read_files_to_dictionaries("Lyrics")
     dic_song_dic_term_frequency = unigram_model.get_TF_values(dic_song_dic_term_count)
-    dic_term_idfs = unigram_model.get_IDF_values(dic_song_dic_term_count)
+    dic_term_idfs = unigram_model.get_IDF_values(dic_song_dic_term_frequency)
 
 main()
 
