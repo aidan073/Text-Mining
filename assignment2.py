@@ -1,81 +1,83 @@
-import os
-import string
 import math
-
-import nltk
-from transformers import AutoTokenizer
+import os
+import re
 from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
 
-tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
-nltk.download('stopwords')
-nltk.download('punkt')
-stop_words = set(stopwords.words('english'))
+class unigram:
+    def read_files_to_dictionaries(self, directory_path):
+        """This method will iterate on all the files in the input sub-directories and for each song calculates the term
+        frequencies
+        @param directory_path: directory path where all the directories of different genre are located
+        @return: dictionary with song name as the key and the value as a dictionary (A). (A) is a dictionary with key
+        representing the token and value being the frequency in the document. The second return type will give you genre for
+        each song."""
+        dic_song_term_frequency = {}
+        for genre in os.listdir(directory_path):
+            path = directory_path + "/" + genre
+            for file in os.listdir(path):
+                temp_dic = {}
+                with open(path + "/" + file, 'r') as rfile:
+                    for line in rfile:
+                        current_line = line.strip()
+                        current_line = current_line.lower()
+                        current_line = re.sub(r'[^\w\s]', '', current_line)
+                        token_list = word_tokenize(current_line)
+                        for token in token_list:
+                            # Update frequency for existing term or add a new term with frequency 1
+                            temp_dic[token] = temp_dic.get(token, 0) + 1
+                song_name = file.split(".")[0]
+                dic_song_term_frequency[song_name] = temp_dic
 
-from collections import defaultdict
+        return dic_song_term_frequency
+    
+    def get_TF_values(self, dic_song_term_frequency):
+        """
+        This method takes in token frequency per song as the input and returns TF per token/song
+        @param dic_song_term_frequency: song name as key and dictionary A as value. In A, keys are the tokens with their
+        frequencies as the values
+        @return: Dictionary with song names as keys, and TF-Values as values. These values are also a dictionary of token as
+        the keys and their TFs as values
+        """
+        dic_tf_per_song = {}
+        for song, frequency_dict in dic_song_term_frequency.items():
+            total_terms = sum(frequency_dict.values())
+            tf_per_token = {token: freq / total_terms for token, freq in frequency_dict.items()} # New dictionary with words as keys, TF as values
+            dic_tf_per_song[song] = tf_per_token # Set value to tf_per_token dictionary
 
-# might be useful?
-from collections import Counter
-
-
-def read_files_in_directory(directory_path):
-    # key: tokens value: their frequency in all songs belonging to a genre
-    dic_term_frequency = defaultdict(int)
-
-    for file in os.listdir(directory_path):
-        with open(directory_path + file, 'r') as rfile:
-            for line in rfile:
-                tokens = tokenize(line)
-                for token in tokens:
-                    dic_term_frequency[token] += 1
-
-    return dic_term_frequency
-
-
-def tokenize(text):
-    text = text.strip()
-    text = text.lower()
-    tokens = tokenizer.tokenize(text)
-    tokens = [word for word in tokens if word.lower() not in stop_words]
-    return tokens
+        return dic_tf_per_song
 
 
-def freq_to_prob(dic_term_frequency):
-    dic_term_prob = {}
+    def get_IDF_values(self, dic_song_term_frequency):
+        """
+        This method calculates the IDF values for each token
+        @param dic_song_term_frequency: song name as key and dictionary A as value. In A, keys are the tokens with their
+        frequencies as the values
+        @return: Dictionary with tokens as the keys and IDF values as values
+        """
+        dic_idf_values = {}
+        num_songs = len(dic_song_term_frequency.keys())
 
-    total_terms = sum(dic_term_frequency.values())
-    for term in dic_term_frequency:
-        dic_term_prob[term] = 1 + (dic_term_frequency[term] * 1.0 / total_terms)
+        for song in dic_song_term_frequency:
+            for word in dic_song_term_frequency[song]:
+                # Update df for existing word or add a new word with df 1
+                dic_idf_values[word] = dic_idf_values.get(word, 0) + 1
 
-    return dic_term_prob
-
-
-def calculate_probability(dic_term_prob, input_text):
-    prob = 0.0
-    input_text = tokenize(input_text)
-    probs = []
-    for term in input_text:
-        prob += math.log10(dic_term_prob.get(term, 1))
-        probs.append((term, dic_term_prob.get(term, 1)))
-
-    print(probs)
-    return prob
-
+        for word in dic_idf_values:
+            # The values of dic_idf_values are currently df, change them to idf
+            dic_idf_values[word] = math.log(num_songs / dic_idf_values[word])
+        return dic_idf_values
+    
+    def get_TFIDF_values(self, tf, idf):
+        pass
 
 def main():
     text = """You used to call me on my cell phone
 Late night when you need my love
 Call me on my cell phone"""
-    results = {}
-
-    for genre in os.listdir("Lyrics"):
-        dic = read_files_in_directory(f"Lyrics/{genre}/")
-        prob = freq_to_prob(dic)
-        p = calculate_probability(prob, text)
-        results[genre] = p
-    sorted_dict = dict(sorted(results.items(), key=lambda item: item[1], reverse=True))
-    for key in sorted_dict:
-        print(f"{key}: {sorted_dict[key]}")
-    return
+    unigram_model = unigram()
+    dic_song_dic_term_count = unigram_model.read_files_to_dictionaries("Lyrics")
+    dic_song_dic_term_frequency = unigram_model.get_TF_values(dic_song_dic_term_count)
+    dic_term_idfs = unigram_model.get_IDF_values(dic_song_dic_term_count)
 
 main()
+
