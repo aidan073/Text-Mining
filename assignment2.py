@@ -12,6 +12,7 @@ class unigram:
         representing the token and value being the frequency in the document. The second return type will give you genre for
         each song."""
         dic_song_term_frequency = {}
+        dic_song_genre = {}
         for genre in os.listdir(directory_path):
             path = directory_path + "/" + genre
             for file in os.listdir(path):
@@ -27,8 +28,9 @@ class unigram:
                             temp_dic[token] = temp_dic.get(token, 0) + 1
                 song_name = file.split(".")[0]
                 dic_song_term_frequency[song_name] = temp_dic
+                dic_song_genre[song_name] = genre
 
-        return dic_song_term_frequency
+        return dic_song_term_frequency, dic_song_genre
     
     def get_TF_values(self, dic_song_term_frequency):
         """
@@ -75,7 +77,7 @@ def main():
 Late night when you need my love
 Call me on my cell phone"""
     unigram_model = unigram()
-    dic_song_dic_term_count = unigram_model.read_files_to_dictionaries("Lyrics")
+    dic_song_dic_term_count, dic_song_genre = unigram_model.read_files_to_dictionaries("Lyrics")
     dic_song_dic_term_frequency = unigram_model.get_TF_values(dic_song_dic_term_count)
     dic_term_idfs = unigram_model.get_IDF_values(dic_song_dic_term_count)
 
