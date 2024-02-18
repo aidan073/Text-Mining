@@ -1,6 +1,7 @@
 import math
 import os
 import re
+import copy
 from nltk.tokenize import word_tokenize
 
 class unigram:
@@ -32,7 +33,7 @@ class unigram:
 
         return dic_genre_word_appearances # i.e. {'Blues': {'had': 17, 'a': 56, 'bad': 25}}
 
-
+class tf_idf_calc:
     def get_TF_values(self, dic_genre_word_appearances):
         """
         This method takes in token frequency per genre as the input and returns TF per token in genre
@@ -70,14 +71,43 @@ class unigram:
         return dic_idf_values
     
     def get_TFIDF_values(self, tf, idf):
-        pass
+
+        dic_genre_tfidf = copy.deepcopy(tf)
+        for inner_dic in dic_genre_tfidf.values():
+            for word in inner_dic:
+                inner_dic[word] = inner_dic[word] * idf[word]
+        return dic_genre_tfidf
+    
+class tester:
+    def classify(self, tfidf, text):
+        results = {}
+
+        text = text.strip()
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\n', ' ', text)
+        text = text.split()
+
+        for word in text:
+            for genre in tfidf:
+                #if word in tfidf[genre].keys():
+                if genre in results:
+                    results[genre] += tfidf[genre].get(word, 0)
+                else:
+                    results[genre] = tfidf[genre].get(word, 0)
+        return max(results, key=results.get)
+
 
 def main():
-    text = """You used to call me on my cell phone
-Late night when you need my love
-Call me on my cell phone"""
+    text = """I've had every promise generationalrift, there's anger in my heart
+You don't know freedombald it's like, chaingar don't have a clue
+If you did you'd find yourselves doing the same gorebor"""
     unigram_model = unigram()
+    tf_idf_calculations = tf_idf_calc()
+    testing = tester()
     dic_genre_word_count = unigram_model.read_files("Lyrics")
-    dic_genre_term_frequencies = unigram_model.get_TF_values(dic_genre_word_count)
-    dic_term_idfs = unigram_model.get_IDF_values(dic_genre_word_count)
+    dic_genre_term_frequencies = tf_idf_calculations.get_TF_values(dic_genre_word_count)
+    dic_term_idfs = tf_idf_calculations.get_IDF_values(dic_genre_word_count)
+    dic_genre_tfidf = tf_idf_calculations.get_TFIDF_values(dic_genre_term_frequencies, dic_term_idfs)
+    classification = testing.classify(dic_genre_tfidf, text)
 main()
