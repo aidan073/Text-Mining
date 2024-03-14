@@ -30,7 +30,7 @@ class task1:
                         lyrics = lyricsoup.find('div', class_='Lyrics__Container-sc-1ynbvzw-1 kUgSbL')
                         if song_name not in path:
                             if lyrics:
-                                cleanedlyrics = lyrics.get_text(separator=' ')
+                                cleanedlyrics = lyrics.get_text(separator='. ')
                                 pattern = r'\[.*?\]'
                                 cleanedlyrics = re.sub(pattern, '', cleanedlyrics)
                                 csv_writer.writerow([song_name, artist_name,genre,cleanedlyrics])
