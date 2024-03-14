@@ -4,7 +4,9 @@ import os
 import csv
 import re
 import nltk
-from nltk.corpus import cmudict
+from textblob import TextBlob
+from nltk.tokenize import word_tokenize
+from collections import Counter
 
 class task1:
     def scrapesongs(path):
@@ -34,6 +36,33 @@ class task1:
                                 csv_writer.writerow([song_name, artist_name,genre,cleanedlyrics])
 
 class task2:
+
+    def getData(self, filepath):
+        with open(filepath, 'r') as file:
+            reader = csv.reader(file)
+            file.readline()
+            for row in reader:
+                genre = row[2]
+                lyrics = row[3]
+                genre = task2.preProcess(genre)
+                lyrics = task2.preProcess(lyrics)
+                task2.extractFeatures(lyrics)
+
+    @staticmethod
+    def preProcess(text):
+        text = text.strip()
+        text= text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+
+        return text
+
+    @staticmethod
+    def extractFeatures(lyrics):
+        words = word_tokenize(lyrics)
+        word_freq = Counter(words)
+        sentiment = TextBlob(lyrics).sentiment
+        print("Word frequency:", word_freq)
+        print("Sentiment:", sentiment)
 
 class task3:
     pass
