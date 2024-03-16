@@ -5,8 +5,13 @@ import csv
 import re
 import nltk
 from textblob import TextBlob
+from nltk.corpus import cmudict
 from nltk.tokenize import word_tokenize
 from collections import Counter
+nltk.download('cmudict')
+
+# CMU pronouncing dictionary for rhyme count
+d = cmudict.dict()
 
 class task1:
     def scrapesongs(path):
@@ -37,32 +42,63 @@ class task1:
 
 class task2:
 
-    def getData(self, filepath):
-        with open(filepath, 'r') as file:
+    def processData(self, filepath):
+        with open(filepath, 'r', encoding='utf-8') as file:
             reader = csv.reader(file)
             file.readline()
+            nn_input = []
             for row in reader:
                 genre = row[2]
                 lyrics = row[3]
                 genre = task2.preProcess(genre)
                 lyrics = task2.preProcess(lyrics)
-                task2.extractFeatures(lyrics)
+                features = task2.extractFeatures(lyrics)
+                nn_input.append(features) # not finalized, needs to be a vector and also will need labels
 
     @staticmethod
     def preProcess(text):
         text = text.strip()
         text= text.lower()
-        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'[^\w\s.]', '', text)
 
         return text
+    
+    @staticmethod
+    def rhyme(word1, word2):
+        return word1 in d and word2 in d and d[word1][0][-1:] == d[word2][0][-1:]
 
     @staticmethod
     def extractFeatures(lyrics):
-        words = word_tokenize(lyrics)
-        word_freq = Counter(words)
+        features = []
+
+        # Get song length
+        tokens = word_tokenize(lyrics)
+        tokens.pop(0) # Remove leading period
+        song_length = len(tokens)
+
+        # Get text sentiment
         sentiment = TextBlob(lyrics).sentiment
-        print("Word frequency:", word_freq)
+
+        # Get rhyme count
+        rhyme_count = 0
+        last_words = []
+        for i in range(len(tokens)):
+            if tokens[i] == '.' and tokens[i-1] != '.':
+                last_words.append(tokens[i-1])
+
+        for i in range(len(last_words) - 1):
+            if task2.rhyme(last_words[i], last_words[i+1]):
+                rhyme_count += 1
+
+
+        print("Song length:", song_length)
         print("Sentiment:", sentiment)
+        print("Rhyme count", rhyme_count)
+        features.append(song_length)
+        features.append(sentiment)
+        features.append(rhyme_count)
+
+        return features
 
 class task3:
     pass
