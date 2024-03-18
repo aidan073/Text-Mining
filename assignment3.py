@@ -5,7 +5,7 @@ import csv
 import re
 import nltk
 from textblob import TextBlob
-from nltk.corpus import cmudict
+from nltk.corpus import cmudict, stopwords
 from nltk.tokenize import word_tokenize
 from collections import Counter
 import torch
@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import Counter
 nltk.download('cmudict')
 
 # CMU pronouncing dictionary for rhyme count
@@ -68,6 +69,7 @@ class task2:
     
     def processTestData(self, filepath):
         nn_input = []
+        genre_list = []
         for genre in os.listdir(filepath):
             genre_path = os.path.join(filepath, genre)
             for song_file in os.listdir(genre_path):
@@ -77,15 +79,16 @@ class task2:
                 lyrics = task2.preProcess(song_text)
                 features = task2.extractFeatures(lyrics)
                 nn_input.append(features)
+                genre_list.append(genre.lower())
 
-        return nn_input
+        return nn_input, genre_list
 
 
     @staticmethod
     def preProcess(text):
         text = text.strip()
         text= text.lower()
-        text = re.sub(r'[^\w\s\n]', '', text)
+        text = re.sub(r'[^\w\s\n\']', '', text)
 
         return text
     
@@ -122,10 +125,35 @@ class task2:
             if task2.rhyme(last_words[i], last_words[i+1]):
                 rhyme_count += 1
 
+        # Get top 3 word frequency total
+        stop_words = set(stopwords.words('english'))
+        tokens_without_stopwords = [word for word in tokens if word.lower() not in stop_words]
+        word_freq = Counter(tokens_without_stopwords)
+        first3 = 0
+        for word, freq in word_freq.most_common(3):
+            first3 += freq
+
+        # Get possible slang word count
+        slang = 0
+        for token in tokens:
+            if token == "'":
+                slang += 1
+
+        # Get sentence length
+        sentences = 0
+        total = 0
+        for sentence in lyrics.split('\n'):
+            total += len(sentence.split())
+            sentences += 1
+        average_sentence_length = total/sentences
+
         features.append(song_length)
         features.append(sentiment.polarity)
         features.append(sentiment.subjectivity)
         features.append(rhyme_count)
+        features.append(first3)
+        features.append(slang)
+        features.append(average_sentence_length)
 
         return features
 
@@ -155,7 +183,7 @@ class songGenreClassifier(nn.Module):
         valid_losses = []
 
         # Training loop
-        num_epochs = 100
+        num_epochs = 20
         for epoch in range(num_epochs):
             # Training
             self.train()
@@ -220,17 +248,28 @@ def main():
     normalized_train_input = songGenreClassifier.normalize_data(train_input)
     normalized_valid_input = songGenreClassifier.normalize_data(valid_input)
 
-    model = songGenreClassifier(4, 512, 6)
+    model = songGenreClassifier(7, 512, 6)
     model.trainModel(normalized_train_input, train_labels, normalized_valid_input, valid_labels)
 
-    test_input = second_task.processTestData(r"C:\Users\Gigabyte\Desktop\Text Mining\assignment3\Test Songs")
+    test_input, genre_list = second_task.processTestData(r"C:\Users\Gigabyte\Desktop\Text Mining\assignment3\Test Songs")
     test_input = torch.tensor(test_input)
     normalized_test_input = songGenreClassifier.normalize_data(test_input)
     with torch.no_grad():
         output = model(normalized_test_input)
+        prediction_list = []
         for i in range(len(output)):
             predicted_probabilities = output[i]
             predicted_genre = model.getGenre(predicted_probabilities)
+            prediction_list.append(predicted_genre)
+
+        correctpredictions = 0
+        for i in range(len(genre_list)):
+            if prediction_list[i] == genre_list[i]:
+                correctpredictions += 1
+
+        print(genre_list)
+        print(correctpredictions)
+        print(prediction_list)
         
 
 
