@@ -14,6 +14,7 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
+import gensim.downloader as api
 nltk.download('cmudict')
 
 # CMU pronouncing dictionary for rhyme count
@@ -93,15 +94,16 @@ class task2:
         nn_input = []
         genre_list = []
         for genre in os.listdir(test_folder_path):
-            genre_path = os.path.join(test_folder_path, genre)
-            for song_file in os.listdir(genre_path):
-                song_path = os.path.join(genre_path, song_file)
-                with open(song_path, 'r', encoding='utf-8') as file:
-                    song_text = file.read()
-                lyrics = task2.preProcess(song_text)
-                features = task2.extractFeatures(lyrics)
-                nn_input.append(features)
-                genre_list.append(genre.lower())
+            if genre != '.DS_Store':
+                genre_path = os.path.join(test_folder_path, genre)
+                for song_file in os.listdir(genre_path):
+                    song_path = os.path.join(genre_path, song_file)
+                    with open(song_path, 'r', encoding='utf-8') as file:
+                        song_text = file.read()
+                    lyrics = task2.preProcess(song_text)
+                    features = task2.extractFeatures(lyrics)
+                    nn_input.append(features)
+                    genre_list.append(genre.lower())
 
         return nn_input, genre_list
 
@@ -217,7 +219,93 @@ class task2:
         return features
 
 class task3:
-    pass
+    @staticmethod
+    def processData(filepath, word2vec_model):
+        """
+        Processes the data from a specified file path for training the neural network.
+
+        Args:
+            filepath (str): The path to the file containing the data.
+            word2vec_model: Pre-trained Word2Vec model.
+
+        Returns:
+            Tuple: A tuple containing the processed input data and labels.
+        """
+        with open(filepath, 'r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            nn_labels = []
+            nn_input = []
+            file.readline()
+
+            for row in reader:
+                genre = row[2]
+                genre = task2.preProcess(genre)
+                nn_labels.append(task2.genreIndex(genre))
+
+                lyrics = row[3]
+                lyrics = task2.preProcess(lyrics)
+                lyric_embedding = task3.getLyricEmbedding(lyrics, word2vec_model)
+                nn_input.append(lyric_embedding)
+
+            return nn_input, nn_labels
+        
+    @staticmethod
+    def getLyricEmbedding(lyrics, word2vec_model):
+        """
+        Get the vector representation of the entire lyric by averaging word embeddings.
+
+        Args:
+            lyrics (str): The lyrics of the song.
+            word2vec_model: Pre-trained Word2Vec model.
+
+        Returns:
+            numpy array: The vector representation of the lyric.
+        """
+        # Tokenize the lyrics into words
+        tokens = word_tokenize(lyrics)
+
+        # Filter out stopwords
+        stop_words = set(stopwords.words('english'))
+        tokens = [word for word in tokens if word.lower() not in stop_words]
+
+        # Get word embeddings for each word and average them
+        embeddings = [word2vec_model[word] for word in tokens if word in word2vec_model]
+        if embeddings:
+            lyric_embedding = np.mean(embeddings, axis=0)
+        else:
+            # If no word in the lyric is found in the word2vec model, return zeros
+            lyric_embedding = np.zeros(word2vec_model.vector_size)
+
+        return lyric_embedding
+    
+    def processTestData(self, folder_name, word2vec_model):
+        """
+        Processes the test data from a specified file path.
+
+        Args:
+            filepath (str): The path to the file containing the test data.
+
+        Returns:
+            Tuple: A tuple containing the processed test input data and labels.
+        """
+        program_dir = os.path.dirname(os.path.realpath(__file__))  # Get the program's directory
+        test_folder_path = os.path.join(program_dir, folder_name)  # Construct the full path to the test folder
+        nn_input = []
+        genre_list = []
+        for genre in os.listdir(test_folder_path):
+            if genre != '.DS_Store':
+                genre_path = os.path.join(test_folder_path, genre)
+                for song_file in os.listdir(genre_path):
+                    song_path = os.path.join(genre_path, song_file)
+                    with open(song_path, 'r', encoding='utf-8') as file:
+                        song_text = file.read()
+                    lyrics = task2.preProcess(song_text)
+                    genre_list.append(genre.lower())
+                    lyric_embedding = task3.getLyricEmbedding(lyrics, word2vec_model)
+                    nn_input.append(lyric_embedding)
+
+        return nn_input, genre_list
+
 
 class songGenreClassifier(nn.Module):
     """
@@ -254,7 +342,7 @@ class songGenreClassifier(nn.Module):
         x = self.softmax(x)
         return x
     
-    def trainModel(self, train_input, train_labels, valid_input, valid_labels):
+    def trainModel(self, train_input, train_labels, valid_input, valid_labels, num_epochs):
         """
         Trains the neural network model.
 
@@ -274,7 +362,6 @@ class songGenreClassifier(nn.Module):
         valid_losses = []
 
         # Training loop
-        num_epochs = 45
         for epoch in range(num_epochs):
             # Training
             self.train()
@@ -338,6 +425,8 @@ class songGenreClassifier(nn.Module):
 
 
 def main():
+    word2vec_model = api.load("word2vec-google-news-300")
+
     # Get instances of task objects
     first_task = task1()
     second_task = task2()
@@ -356,9 +445,21 @@ def main():
     normalized_train_input = songGenreClassifier.normalize_data(train_input)
     normalized_valid_input = songGenreClassifier.normalize_data(valid_input)
 
+    train_input2, train_labels2 = third_task.processData("trainingdata.csv", word2vec_model)
+    valid_input2, valid_labels2 = third_task.processData("validationdata.csv", word2vec_model)
+    train_input2 = torch.tensor(train_input2)
+    train_labels2 = torch.tensor(train_labels2)
+    valid_input2 = torch.tensor(valid_input2)
+    valid_labels2 = torch.tensor(valid_labels2)
+    normalized_train_input2 = songGenreClassifier.normalize_data(train_input2)
+    normalized_valid_input2 = songGenreClassifier.normalize_data(valid_input2)
+
     # Instantiate/train model
     model = songGenreClassifier(7, 512, 6)
-    model.trainModel(normalized_train_input, train_labels, normalized_valid_input, valid_labels)
+    model.trainModel(normalized_train_input, train_labels, normalized_valid_input, valid_labels, 45)
+
+    model2 = songGenreClassifier(word2vec_model.vector_size, 512, 6)
+    model2.trainModel(normalized_train_input2, train_labels2, normalized_valid_input2, valid_labels2, 45)
 
     # Test model
     test_input, genre_list = second_task.processTestData("Test Songs")
@@ -381,6 +482,25 @@ def main():
         print(correctpredictions)
         print(prediction_list)
         
+    test_input2, genre_list2 = third_task.processTestData("Test Songs", word2vec_model)
+    test_input2 = torch.tensor(test_input2)
+    normalized_test_input2 = songGenreClassifier.normalize_data(test_input2)
+    with torch.no_grad():
+        output = model2(normalized_test_input2)
+        prediction_list = []
+        for i in range(len(output)):
+            predicted_probabilities = output[i]
+            predicted_genre = model2.getGenre(predicted_probabilities)
+            prediction_list.append(predicted_genre)
+
+        correctpredictions = 0
+        for i in range(len(genre_list2)):
+            if prediction_list[i] == genre_list2[i]:
+                correctpredictions += 1
+
+        print(genre_list2)
+        print(correctpredictions)
+        print(prediction_list)    
 
 
 if __name__ == "__main__":
