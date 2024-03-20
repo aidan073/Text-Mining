@@ -47,8 +47,19 @@ class task1:
                                 csv_writer.writerow([song_name, artist_name,genre,cleanedlyrics])
 
 class task2:
-
+    """
+    A class for processing song data for training and testing. 
+    """
     def processData(self, filepath):
+        """
+        Processes the data from a specified file path for training the neural network.
+
+        Args:
+            filepath (str): The path to the file containing the data.
+
+        Returns:
+            Tuple: A tuple containing the processed input data and labels.
+        """
         with open(filepath, 'r', encoding='utf-8') as file:
             reader = csv.reader(file)
             nn_labels = []
@@ -67,11 +78,22 @@ class task2:
 
             return nn_input, nn_labels
     
-    def processTestData(self, filepath):
+    def processTestData(self, folder_name):
+        """
+        Processes the test data from a specified file path.
+
+        Args:
+            filepath (str): The path to the file containing the test data.
+
+        Returns:
+            Tuple: A tuple containing the processed test input data and labels.
+        """
+        program_dir = os.path.dirname(os.path.realpath(__file__))  # Get the program's directory
+        test_folder_path = os.path.join(program_dir, folder_name)  # Construct the full path to the test folder
         nn_input = []
         genre_list = []
-        for genre in os.listdir(filepath):
-            genre_path = os.path.join(filepath, genre)
+        for genre in os.listdir(test_folder_path):
+            genre_path = os.path.join(test_folder_path, genre)
             for song_file in os.listdir(genre_path):
                 song_path = os.path.join(genre_path, song_file)
                 with open(song_path, 'r', encoding='utf-8') as file:
@@ -86,6 +108,15 @@ class task2:
 
     @staticmethod
     def preProcess(text):
+        """
+        Preprocesses the text data.
+
+        Args:
+            text (str): The text to be preprocessed.
+
+        Returns:
+            str: The preprocessed text.
+        """
         text = text.strip()
         text= text.lower()
         text = re.sub(r'[^\w\s\n\']', '', text)
@@ -94,16 +125,44 @@ class task2:
     
     @staticmethod
     def genreIndex(genre):
+        """
+        Gets the index of a genre in the genres list.
+
+        Args:
+            genre (str): The genre name.
+
+        Returns:
+            int: The index of the genre in the genres list.
+        """
         genres = ['rap', 'metal', 'rock', 'pop', 'country', 'blues']
 
         return genres.index(genre)
     
     @staticmethod
     def rhyme(word1, word2):
+        """
+        Checks if two words rhyme.
+
+        Args:
+            word1 (str): The first word.
+            word2 (str): The second word.
+
+        Returns:
+            bool: True if the words rhyme, False otherwise.
+        """
         return word1 in d and word2 in d and d[word1][0][-1:] == d[word2][0][-1:]
 
     @staticmethod
     def extractFeatures(lyrics):
+        """
+        Extracts features from the lyrics.
+
+        Args:
+            lyrics (str): The lyrics of the song.
+
+        Returns:
+            List: A list of features extracted from the lyrics.
+        """
         features = []
 
         # Get song length
@@ -161,7 +220,18 @@ class task3:
     pass
 
 class songGenreClassifier(nn.Module):
+    """
+    A neural network classifier for predicting song genres based on song features.
+    """
     def __init__(self, input_size, hidden_size, output_size):
+        """
+        Initializes the classifier with input, hidden, and output sizes.
+
+        Args:
+            input_size (int): The size of the input features.
+            hidden_size (int): The size of the hidden layer.
+            output_size (int): The size of the output (number of genres).
+        """
         super(songGenreClassifier, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
@@ -169,6 +239,15 @@ class songGenreClassifier(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
+        """
+        Performs forward pass through the neural network.
+
+        Args:
+            x (tensor): The input tensor.
+
+        Returns:
+            tensor: The output tensor after passing through the network.
+        """
         x = self.fc1(x)
         x = self.relu(x)
         x = self.fc2(x)
@@ -176,6 +255,18 @@ class songGenreClassifier(nn.Module):
         return x
     
     def trainModel(self, train_input, train_labels, valid_input, valid_labels):
+        """
+        Trains the neural network model.
+
+        Args:
+            train_input (tensor): The input data for training.
+            train_labels (tensor): The labels for training.
+            valid_input (tensor): The input data for validation.
+            valid_labels (tensor): The labels for validation.
+
+        Returns:
+            None
+        """
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(self.parameters(), lr=0.001)
 
@@ -183,7 +274,7 @@ class songGenreClassifier(nn.Module):
         valid_losses = []
 
         # Training loop
-        num_epochs = 20
+        num_epochs = 45
         for epoch in range(num_epochs):
             # Training
             self.train()
@@ -212,7 +303,15 @@ class songGenreClassifier(nn.Module):
         plt.show()
 
     def getGenre(self, predicted_probabilities):
-        # Get the genre with the highest probability
+        """
+        Gets the predicted genre based on the highest probability.
+
+        Args:
+            predicted_probabilities (tensor): The predicted probabilities for each genre.
+
+        Returns:
+            str: The predicted genre.
+        """
         genres = ['rap', 'metal', 'rock', 'pop', 'country', 'blues']
         predicted_genre_index = torch.argmax(predicted_probabilities, dim=0).item()
         predicted_genre = genres[predicted_genre_index]
@@ -221,6 +320,16 @@ class songGenreClassifier(nn.Module):
     
     @staticmethod
     def normalize_data(data, epsilon=1e-8):
+        """
+        Normalizes the input data.
+
+        Args:
+            data (tensor): The input data to be normalized.
+            epsilon (float): Small value to prevent division by zero.
+
+        Returns:
+            tensor: The normalized data.
+        """
         mean = torch.mean(data, axis=0)
         std = torch.std(data, axis=0)
         normalized_data = (data - mean) / (std + epsilon)
@@ -237,10 +346,9 @@ def main():
     #testsongspath = "/Users/evankoenig/Downloads/Test Songs"
     #first_task.scrapesongs(testsongspath)
     
-    # Load and process data
+    # Load, process, and format data
     train_input, train_labels = second_task.processData("trainingdata.csv")
     valid_input, valid_labels = second_task.processData("validationdata.csv")
-
     train_input = torch.tensor(train_input)
     train_labels = torch.tensor(train_labels)
     valid_input = torch.tensor(valid_input)
@@ -248,10 +356,12 @@ def main():
     normalized_train_input = songGenreClassifier.normalize_data(train_input)
     normalized_valid_input = songGenreClassifier.normalize_data(valid_input)
 
+    # Instantiate/train model
     model = songGenreClassifier(7, 512, 6)
     model.trainModel(normalized_train_input, train_labels, normalized_valid_input, valid_labels)
 
-    test_input, genre_list = second_task.processTestData(r"C:\Users\Gigabyte\Desktop\Text Mining\assignment3\Test Songs")
+    # Test model
+    test_input, genre_list = second_task.processTestData("Test Songs")
     test_input = torch.tensor(test_input)
     normalized_test_input = songGenreClassifier.normalize_data(test_input)
     with torch.no_grad():
