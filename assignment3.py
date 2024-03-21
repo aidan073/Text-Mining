@@ -94,16 +94,15 @@ class task2:
         nn_input = []
         genre_list = []
         for genre in os.listdir(test_folder_path):
-            if genre != '.DS_Store':
-                genre_path = os.path.join(test_folder_path, genre)
-                for song_file in os.listdir(genre_path):
-                    song_path = os.path.join(genre_path, song_file)
-                    with open(song_path, 'r', encoding='utf-8') as file:
-                        song_text = file.read()
-                    lyrics = task2.preProcess(song_text)
-                    features = task2.extractFeatures(lyrics)
-                    nn_input.append(features)
-                    genre_list.append(genre.lower())
+            genre_path = os.path.join(test_folder_path, genre)
+            for song_file in os.listdir(genre_path):
+                song_path = os.path.join(genre_path, song_file)
+                with open(song_path, 'r', encoding='utf-8') as file:
+                    song_text = file.read()
+                lyrics = task2.preProcess(song_text)
+                features = task2.extractFeatures(lyrics)
+                nn_input.append(features)
+                genre_list.append(genre.lower())
 
         return nn_input, genre_list
 
@@ -223,11 +222,9 @@ class task3:
     def processData(filepath, word2vec_model):
         """
         Processes the data from a specified file path for training the neural network.
-
         Args:
             filepath (str): The path to the file containing the data.
             word2vec_model: Pre-trained Word2Vec model.
-
         Returns:
             Tuple: A tuple containing the processed input data and labels.
         """
@@ -248,16 +245,14 @@ class task3:
                 nn_input.append(lyric_embedding)
 
             return nn_input, nn_labels
-        
+
     @staticmethod
     def getLyricEmbedding(lyrics, word2vec_model):
         """
         Get the vector representation of the entire lyric by averaging word embeddings.
-
         Args:
             lyrics (str): The lyrics of the song.
             word2vec_model: Pre-trained Word2Vec model.
-
         Returns:
             numpy array: The vector representation of the lyric.
         """
@@ -277,14 +272,12 @@ class task3:
             lyric_embedding = np.zeros(word2vec_model.vector_size)
 
         return lyric_embedding
-    
+
     def processTestData(self, folder_name, word2vec_model):
         """
         Processes the test data from a specified file path.
-
         Args:
             filepath (str): The path to the file containing the test data.
-
         Returns:
             Tuple: A tuple containing the processed test input data and labels.
         """
@@ -305,7 +298,6 @@ class task3:
                     nn_input.append(lyric_embedding)
 
         return nn_input, genre_list
-
 
 class songGenreClassifier(nn.Module):
     """
@@ -422,6 +414,65 @@ class songGenreClassifier(nn.Module):
         normalized_data = (data - mean) / (std + epsilon)
 
         return normalized_data
+    
+class F1Score:
+    def __init__(self, labels):
+        self.labels = labels
+        self.num_classes = len(labels)
+        self.label_to_index = {label: i for i, label in enumerate(labels)}
+        self.reset()
+
+    def reset(self):
+        self.tp = [0] * self.num_classes
+        self.fp = [0] * self.num_classes
+        self.fn = [0] * self.num_classes
+
+    def update(self, y_true_list, y_pred_list):
+        if len(y_true_list) != len(y_pred_list):
+            raise ValueError("Length of y_true_list and y_pred_list must be the same")
+
+        for y_true, y_pred in zip(y_true_list, y_pred_list):
+            y_true_index = self.label_to_index.get(y_true, None)
+            y_pred_index = self.label_to_index.get(y_pred, None)
+
+            if y_true_index is None or y_pred_index is None:
+                raise ValueError("Invalid label")
+
+            self.tp[y_true_index] += (y_true == y_pred)
+            self.fp[y_pred_index] += (y_true != y_pred)
+            self.fn[y_true_index] += (y_true != y_pred)
+
+    def precision(self, class_label):
+        class_index = self.label_to_index.get(class_label, None)
+        if class_index is None:
+            raise ValueError("Invalid label")
+        return self.tp[class_index] / max(1, self.tp[class_index] + self.fp[class_index])
+
+    def recall(self, class_label):
+        class_index = self.label_to_index.get(class_label, None)
+        if class_index is None:
+            raise ValueError("Invalid label")
+        return self.tp[class_index] / max(1, self.tp[class_index] + self.fn[class_index])
+
+    def f1(self, class_label):
+        p = self.precision(class_label)
+        r = self.recall(class_label)
+        return 2 * p * r / max(1e-9, p + r)
+
+    def macro_f1(self):
+        f1_scores = [self.f1(label) for label in self.labels]
+        return sum(f1_scores) / max(1, len(f1_scores))
+
+    def micro_f1(self):
+        tp = sum(self.tp)
+        fp = sum(self.fp)
+        fn = sum(self.fn)
+        precision = tp / max(1, tp + fp)
+        recall = tp / max(1, tp + fn)
+        return 2 * precision * recall / max(1e-9, precision + recall)
+
+    def genre_f1_scores(self):
+        return {label: self.f1(label) for label in self.labels}
 
 
 def main():
@@ -454,14 +505,13 @@ def main():
     normalized_train_input2 = songGenreClassifier.normalize_data(train_input2)
     normalized_valid_input2 = songGenreClassifier.normalize_data(valid_input2)
 
-    # Instantiate/train model
+    # Instantiate/train models
     model = songGenreClassifier(7, 512, 6)
     model.trainModel(normalized_train_input, train_labels, normalized_valid_input, valid_labels, 45)
-
     model2 = songGenreClassifier(word2vec_model.vector_size, 512, 6)
     model2.trainModel(normalized_train_input2, train_labels2, normalized_valid_input2, valid_labels2, 45)
 
-    # Test model
+    # Test model1
     test_input, genre_list = second_task.processTestData("Test Songs")
     test_input = torch.tensor(test_input)
     normalized_test_input = songGenreClassifier.normalize_data(test_input)
@@ -481,26 +531,49 @@ def main():
         print(genre_list)
         print(correctpredictions)
         print(prediction_list)
-        
+
+    # Test model2
     test_input2, genre_list2 = third_task.processTestData("Test Songs", word2vec_model)
     test_input2 = torch.tensor(test_input2)
     normalized_test_input2 = songGenreClassifier.normalize_data(test_input2)
     with torch.no_grad():
         output = model2(normalized_test_input2)
-        prediction_list = []
+        prediction_list2 = []
         for i in range(len(output)):
             predicted_probabilities = output[i]
             predicted_genre = model2.getGenre(predicted_probabilities)
-            prediction_list.append(predicted_genre)
+            prediction_list2.append(predicted_genre)
 
         correctpredictions = 0
         for i in range(len(genre_list2)):
-            if prediction_list[i] == genre_list2[i]:
+            if prediction_list2[i] == genre_list2[i]:
                 correctpredictions += 1
 
         print(genre_list2)
         print(correctpredictions)
-        print(prediction_list)    
+        print(prediction_list2)    
+
+    # F1 score
+    f1_score_obj = F1Score(['rap', 'metal', 'rock', 'pop', 'country', 'blues'])
+    f1_score_obj.update(genre_list, prediction_list)
+    f1_score_obj2 = F1Score(['rap', 'metal', 'rock', 'pop', 'country', 'blues'])
+    f1_score_obj2.update(genre_list2, prediction_list2)
+
+    # Calculate and print the macro and micro F1 scores
+    macro_f1 = f1_score_obj.macro_f1()
+    micro_f1 = f1_score_obj.micro_f1()
+    print(f"Macro F1: {macro_f1}, Micro F1: {micro_f1}")
+    macro_f1 = f1_score_obj2.macro_f1()
+    micro_f1 = f1_score_obj2.micro_f1()
+    print(f"Macro F1: {macro_f1}, Micro F1: {micro_f1}")
+
+    genre_f1_scores = f1_score_obj.genre_f1_scores()
+    for genre, f1_score in genre_f1_scores.items():
+        print(f"{genre}: {f1_score}")
+    
+    genre_f1_scores2 = f1_score_obj2.genre_f1_scores()
+    for genre, f1_score in genre_f1_scores2.items():
+        print(f"{genre}: {f1_score}")
 
 
 if __name__ == "__main__":
