@@ -416,18 +416,47 @@ class songGenreClassifier(nn.Module):
         return normalized_data
     
 class F1Score:
+    """
+    Class for calculating F1 scores for multiple classes.
+
+    Attributes:
+        labels (list): List of class labels.
+        num_classes (int): Number of classes.
+        label_to_index (dict): Mapping of class labels to indices.
+        tp (list): True positives for each class.
+        fp (list): False positives for each class.
+        fn (list): False negatives for each class.
+    """
+
     def __init__(self, labels):
+        """
+        Initialize the F1Score class.
+
+        Args:
+            labels (list): List of class labels.
+        """
         self.labels = labels
         self.num_classes = len(labels)
         self.label_to_index = {label: i for i, label in enumerate(labels)}
         self.reset()
 
     def reset(self):
+        """Reset the counters for true positives, false positives, and false negatives."""
         self.tp = [0] * self.num_classes
         self.fp = [0] * self.num_classes
         self.fn = [0] * self.num_classes
 
     def update(self, y_true_list, y_pred_list):
+        """
+        Update the F1 score counters based on true labels and predicted labels.
+
+        Args:
+            y_true_list (list): List of true labels.
+            y_pred_list (list): List of predicted labels.
+
+        Raises:
+            ValueError: If lengths of y_true_list and y_pred_list are not the same or if labels are invalid.
+        """
         if len(y_true_list) != len(y_pred_list):
             raise ValueError("Length of y_true_list and y_pred_list must be the same")
 
@@ -443,27 +472,72 @@ class F1Score:
             self.fn[y_true_index] += (y_true != y_pred)
 
     def precision(self, class_label):
+        """
+        Calculate precision for a specific class label.
+
+        Args:
+            class_label (str): Class label.
+
+        Returns:
+            float: Precision for the given class label.
+
+        Raises:
+            ValueError: If label is invalid.
+        """
         class_index = self.label_to_index.get(class_label, None)
         if class_index is None:
             raise ValueError("Invalid label")
         return self.tp[class_index] / max(1, self.tp[class_index] + self.fp[class_index])
 
     def recall(self, class_label):
+        """
+        Calculate recall for a specific class label.
+
+        Args:
+            class_label (str): Class label.
+
+        Returns:
+            float: Recall for the given class label.
+
+        Raises:
+            ValueError: If label is invalid.
+        """
         class_index = self.label_to_index.get(class_label, None)
         if class_index is None:
             raise ValueError("Invalid label")
         return self.tp[class_index] / max(1, self.tp[class_index] + self.fn[class_index])
 
     def f1(self, class_label):
+        """
+        Calculate F1 score for a specific class label.
+
+        Args:
+            class_label (str): Class label.
+
+        Returns:
+            float: F1 score for the given class label.
+        """
         p = self.precision(class_label)
         r = self.recall(class_label)
         return 2 * p * r / max(1e-9, p + r)
 
     def macro_f1(self):
+        """
+        Calculate the macro-averaged F1 score.
+
+        Returns:
+            float: Macro-averaged F1 score.
+        """
         f1_scores = [self.f1(label) for label in self.labels]
         return sum(f1_scores) / max(1, len(f1_scores))
 
     def micro_f1(self):
+        """
+        Calculate the micro-averaged F1 score.
+
+        Returns:
+            float: Micro-averaged F1 score.
+        """
         tp = sum(self.tp)
         fp = sum(self.fp)
         fn = sum(self.fn)
@@ -472,6 +546,12 @@ class F1Score:
         return 2 * precision * recall / max(1e-9, precision + recall)
 
     def genre_f1_scores(self):
+        """
+        Calculate F1 scores for each class label.
+
+        Returns:
+            dict: Dictionary of class labels and their corresponding F1 scores.
+        """
         return {label: self.f1(label) for label in self.labels}
 
 
